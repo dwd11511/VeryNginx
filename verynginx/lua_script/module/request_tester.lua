@@ -10,12 +10,15 @@ local _M = {}
 
 local tester = {}
 
+local json = require "json"
 function _M.test( matcher )
     if matcher == nil then
         return false
     end
-    
+    -- matcher here is not the 'matcher' in config.json
 	for name, v in pairs( matcher ) do
+        --ngx.log(ngx.ERR, "name in matcher is:", name)
+        --ngx.log(ngx.ERR, "v in matcher is:", json.encode(v))
         if tester[name] ~= nil then
             if tester[name]( v ) ~= true then
                 return false
@@ -68,14 +71,13 @@ end
 --test a group of var in table with a condition 
 function _M.test_many_var( var_table, condition )
     
-    local find = ngx.re.find
     local test_var = _M.test_var
 
     local name_operator = condition['name_operator']
     local name_value = condition['name_value']
     local operator = condition['operator']
     local value = condition['value']
-	
+
      -- Insert !Exist Check here as it is only applied to operator
     if operator == '!Exist' then
         for k, v in pairs(var_table) do
@@ -127,59 +129,138 @@ end
 function _M.test_args( condition )
     local find = ngx.re.find
     local test_var = _M.test_var
-    
-    local name_operator = condition['name_operator']
-    local name_value = condition['name_value']
-    local operator = condition['operator']
-    local value = condition['value']
 
-    --handle args behind uri
-    for k,v in pairs( ngx.req.get_uri_args()) do
-        if test_var( name_operator, name_value, k ) == true then
-            if type(v) == "table" then
-                for arg_idx,arg_value in ipairs(v) do
-                    if test_var( operator, value, arg_value ) == true then 
-                        return true 
+    --ngx.log( ngx.ERR, "in test_args, condition:", json.encode(condition) )
+    --old version value is one string
+    if condition[1] == nil then
+        --这里是老板condition，类型是字典，直接把键和值读出来
+        --ngx.log(ngx.ERR, "\nenter ONE arg test")
+        local name_operator = condition['name_operator']
+        local name_value = condition['name_value']
+        local operator = condition['operator']
+        local value = condition['value']
+        --ngx.log(ngx.ERR, "ONE ARG is: ", value)
+        --handle args behind uri
+        for k,v in pairs( ngx.req.get_uri_args()) do
+            --参数名对的上
+            --ngx.log(ngx.ERR, json.encode(v))
+            ngx.log(ngx.ERR, "k in ngx.req.get_uri_args():", json.encode(k))
+            ngx.log(ngx.ERR, "v in ngx.req.get_uri_args():", json.encode(v))
+            if test_var( name_operator, name_value, k ) == true then
+                --当url中对同一参数名指定不同参数值时，两个参数值组成table。
+                if type(v) == "table" then
+                    for arg_idx,arg_value in ipairs(v) do
+                        --参数值对的上
+                        if test_var( operator, value, arg_value ) == true then 
+                            return true
+                        end
                     end
-                end
-            else
-                if test_var( operator, value, v ) == true then
-                    return true 
+                else
+                    if test_var( operator, value, v ) == true then
+                        return true
+                    end
                 end
             end
         end
-    end
-    
-    ngx.req.read_body()
-    --ensure body has not be cached into temp file
-    if ngx.req.get_body_file() ~= nil then
-        return false
-    end
-    
-    local body_args,err = ngx.req.get_post_args()
-    if body_args == nil then
-        ngx.say("failed to get post args: ", err)
-        return false
-    end
-    
-    --check args in body
-    for k,v in pairs( body_args ) do
-        if test_var( name_operator, name_value, k ) == true then
-            if type(v) == "table" then
-                for arg_idx,arg_value in ipairs(v) do
-                    if test_var( operator, value, arg_value ) == true then 
-                        return true 
+        ngx.req.read_body()
+        --ensure body has not be cached into temp file
+        if ngx.req.get_body_file() ~= nil then
+            return false
+        end
+        local body_args,err = ngx.req.get_post_args()
+        if body_args == nil then
+            ngx.say("failed to get post args: ", err)
+            return false
+        end
+        --check args in body
+        for k,v in pairs( body_args ) do
+            if test_var( name_operator, name_value, k ) == true then
+                if type(v) == "table" then
+                    for arg_idx,arg_value in ipairs(v) do
+                        if test_var( operator, value, arg_value ) == true then 
+                            return true
+                        end
                     end
-                end
-            else
-                if test_var( operator, value, v ) == true then
-                    return true 
+                else
+                    if test_var( operator, value, v ) == true then
+                        return true
+                    end
                 end
             end
         end
-    end
+        return false
+    --如果需要匹配多个参数
+    elseif type( condition[1] ) == "table" then
+        --ngx.log(ngx.ERR, '\nenter table test')
+        --总共应该匹配count条规则
+        local count = #condition
+        for ck,cv in pairs(condition) do
+            local name_operator = cv['name_operator']
+            local name_value = cv['name_value']
+            local operator = cv['operator']
+            local value = cv['value']
+            --ngx.log(ngx.ERR, name_operator..'\t'..name_value..'\t'..operator..'\t'..value)
+            --#region
+            --对于url中的每一个参数
+            for k,v in pairs( ngx.req.get_uri_args()) do
+                --ngx.log(ngx.ERR, json.encode(v))
+                --ngx.log(ngx.ERR, "v in ngx.req.get_uri_args():", json.encode(v))
+                --参数名对的上
+                if test_var( name_operator, name_value, k ) == true then
+                    --当url中对同一参数名指定不同参数值时，两个参数值组成table。
+                    if type(v) == "table" then
+                        for arg_idx,arg_value in ipairs(v) do
+                            --参数值对不上
+                            if test_var( operator, value, arg_value ) == true then
+                                --return false
+                                count = count - 1
+                            end
+                        end
+                    else
+                        if test_var( operator, value, v ) == true then
+                            --return false
+                            count = count - 1
+                        end
+                    end
+                end
+            end
+            ngx.req.read_body()
+            --ensure body has not be cached into temp file
+            if ngx.req.get_body_file() ~= nil then
+                return false
+            end
 
-    return false
+            local body_args,err = ngx.req.get_post_args()
+            if body_args == nil then
+                ngx.say("failed to get post args: ", err)
+                return false
+            end
+
+            --check args in body
+            for k,v in pairs( body_args ) do
+                --参数名
+                if test_var( name_operator, name_value, k ) == true then
+                    if type(v) == "table" then
+                        for arg_idx,arg_value in ipairs(v) do
+                            if test_var( operator, value, arg_value ) == true then 
+                                --return false
+                                count = count - 1
+                            end
+                        end
+                    else
+                        if test_var( operator, value, v ) == true then
+                            --return false
+                            count = count - 1
+                        end
+                    end
+                end
+            end
+            --#region
+        end
+        return count <= 0
+    else
+        return false
+    end
 end
 
 function _M.test_host( condition )
