@@ -1,6 +1,12 @@
 # VeryNginx
 VeryNginx is a very powerful and friendly nginx .
 
+# Sti1l's work
+- 'mail' is used to record the email address that needs to be sent when the alert function takes effect
+- 'alert' is used to mark whether a rule is reliable or not, and choose the interception method accordingly
+- The original 'arg' parameter supports registration in the form of an array [] to adapt to the case of matching multiple parameters at the same time.
+
+
 [中文文档](https://github.com/alexazhou/VeryNginx/blob/master/readme_zh.md)
 
 ### Notice
