@@ -281,6 +281,7 @@ function _M.load_from_file()
 
     --ngx.log(ngx.STDERR, data)
     local tmp = dkjson.decode( data )
+    --ngx.log(ngx.STDERR, "load file is: ", json.encode())
     if tmp ~= nil then
         --update config version if need
         local loop = true
