@@ -274,6 +274,17 @@ function _M.load_from_file()
     local data = file:read("*all");
     file:close();
 
+    --使用string.gsub替换关键词
+    string.gsub(data, '<XSS-identifier>', '| [^a-zA-Z](?:alert|confirm|prompt|document.write|console.log|script|javascript)[^a-zA-Z]|^(?:alert|confirm|prompt|document.write|console.log|script|javascript)[^a-zA-Z]|[^a-zA-Z](?:alert|confirm|prompt|document.write|console.log|script|javascript)$|^(?:alert|confirm|prompt|document.write|console.log|script|javascript)$')
+    string.gsub(data, '<SQLI-identifier>', '| [^a-zA-Z](?:concat|select|and|sleep|union|order|limit|from|where|count|or)[^a-zA-Z]|^(?:concat|select|and|sleep|union|order|limit|from|where|count|or)[^a-zA-Z]|[^a-zA-Z](?:concat|select|and|sleep|union|order|limit|from|where|count|or)$|^(?:concat|select|and|sleep|union|order|limit|from|where|count|or)$')
+    string.gsub(data, '<DT-identifier>', '| [^a-zA-Z](?:..|etc|passwd)[^a-zA-Z]|^(?:..|etc|passwd)[^a-zA-Z]|[^a-zA-Z](?:..|etc|passwd)$|^(?:..|etc|passwd)$')
+    string.gsub(data, '<CI-identifier>', '| [^a-zA-Z](?:..|reboot|touch|cat|whoami|uname|read|tail|head|ping|curl|exit|cd|mkdir)[^a-zA-Z]|^(?:..|reboot|touch|cat|whoami|uname|read|tail|head|ping|curl|exit|cd|mkdir)[^a-zA-Z]|[^a-zA-Z](?:..|reboot|touch|cat|whoami|uname|read|tail|head|ping|curl|exit|cd|mkdir)$|^(?:..|reboot|touch|cat|whoami|uname|read|tail|head|ping|curl|exit|cd|mkdir)$')
+    string.gsub(data, '<ID-identifier>', '| ([^a-zA-Z](?:reboot|poweroff|shutdown)[^a-zA-Z]|^(?:reboot|poweroff|shutdown)[^a-zA-Z]|[^a-zA-Z](?:reboot|poweroff|shutdown)$|^(?:reboot|poweroff|shutdown)$)|(\\S)\\1{39}')
+    string.gsub(data, '<DoS-identifier>', '| [^a-zA-Z](?:reboot|poweroff|shutdown)[^a-zA-Z]|^(?:reboot|poweroff|shutdown)[^a-zA-Z]|[^a-zA-Z](?:reboot|poweroff|shutdown)$|^(?:reboot|poweroff|shutdown)$')
+    string.gsub(data, '<OF-identifier>', '| (\\S)\\1{39}')
+    string.gsub(data, '<FI-identifier>', '| [^a-zA-Z](?:..|etc|passwd)[^a-zA-Z]|^(?:..|etc|passwd)[^a-zA-Z]|[^a-zA-Z](?:..|etc|passwd)$|^(?:..|etc|passwd)$')
+    
+
     --save config hash in module
     local config_hash = ngx.md5(data)
     _M.config_hash = config_hash
@@ -394,6 +405,7 @@ function _M.dump_to_file( config_table )
     
     --ngx.log(ngx.STDERR,config_dump_path)
     local file, err = io.open( config_dump_path, "w")
+    
     if file ~= nil then
         file:write(config_data)
         file:close()
